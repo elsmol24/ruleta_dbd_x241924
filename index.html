@@ -1,0 +1,2120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruleta del Ente - Dead by Daylight Stream Tool</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Cinzel (terror gótico) & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            --blood-red: #dc2626;
+            --blood-dark: #7f1d1d;
+            --entity-orange: #f97316;
+            --bg-dark: #09090b;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #f4f4f5;
+            overflow-x: hidden;
+            transition: background-color 0.3s ease;
+        }
+
+        .font-dbd {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* Fondo atmosférico con bruma sutil */
+        .bg-fog {
+            background-image: 
+                radial-gradient(circle at 50% 40%, rgba(153, 27, 27, 0.18) 0%, rgba(9, 9, 11, 0.95) 65%),
+                repeating-linear-gradient(45deg, rgba(255,255,255,0.01) 0px, rgba(255,255,255,0.01) 2px, transparent 2px, transparent 8px);
+        }
+
+        /* Modos de fondo para OBS / Stream */
+        body.mode-chroma {
+            background-color: #00b140 !important;
+            background-image: none !important;
+        }
+        body.mode-transparent {
+            background-color: transparent !important;
+            background-image: none !important;
+        }
+
+        /* Animación de pulso sangriento */
+        @keyframes pulseBlood {
+            0%, 100% { box-shadow: 0 0 25px rgba(220, 38, 38, 0.45), inset 0 0 15px rgba(220, 38, 38, 0.3); }
+            50% { box-shadow: 0 0 45px rgba(220, 38, 38, 0.8), inset 0 0 25px rgba(220, 38, 38, 0.5); }
+        }
+
+        .glow-blood {
+            animation: pulseBlood 3s infinite ease-in-out;
+        }
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #18181b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #52525b;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #dc2626;
+        }
+
+        /* Animación de entrada del modal ganador */
+        @keyframes slashIn {
+            0% { transform: scale(0.8) translateY(20px); opacity: 0; filter: blur(8px); }
+            60% { transform: scale(1.03) translateY(-4px); opacity: 1; filter: blur(0); }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .animate-slash-in {
+            animation: slashIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Rasguños decorativos */
+        .scratch-divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #dc2626, #f97316, #dc2626, transparent);
+        }
+
+        /* Estilos para reordenamiento por arrastre (Drag & Drop) */
+        .killer-card.dragging {
+            opacity: 0.45;
+            transform: scale(0.98);
+            border-color: #ef4444 !important;
+        }
+        .killer-card.drag-over-top {
+            border-top: 2px solid #f59e0b !important;
+        }
+        .killer-card.drag-over-bottom {
+            border-bottom: 2px solid #f59e0b !important;
+        }
+        .drag-handle {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="bg-fog min-h-screen flex flex-col justify-between selection:bg-red-700 selection:text-white">
+
+    <!-- Barra Superior de Controles de Stream (Se puede ocultar en modo limpio) -->
+    <header id="topBar" class="w-full px-4 py-3 flex flex-wrap items-center justify-between gap-3 z-30 bg-zinc-950/80 backdrop-blur-md border-b border-red-950/60 transition-all duration-300">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-700 to-zinc-900 border border-red-500/40 flex items-center justify-center shadow-lg shadow-red-900/30">
+                <i data-lucide="skull" class="w-6 h-6 text-red-200"></i>
+            </div>
+            <div>
+                <h1 class="font-dbd font-extrabold text-lg sm:text-xl tracking-wider text-zinc-100 leading-none">
+                    LA RULETA DEL <span class="text-red-500">ENTE</span>
+                </h1>
+                <p class="text-xs text-zinc-400 mt-0.5">Dead by Daylight • Edición Streamers</p>
+            </div>
+        </div>
+
+        <!-- Controles rápidos -->
+        <div class="flex flex-wrap items-center gap-2">
+            <!-- Contador de asesinos activos -->
+            <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs font-medium text-zinc-300">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                <span>Activos: <strong id="activeCountBadge" class="text-white">0</strong></span>
+            </div>
+
+            <!-- Control de Audio -->
+            <div class="flex items-center gap-1.5 bg-zinc-900/90 border border-zinc-800 rounded-xl px-2.5 py-1.5">
+                <button id="muteBtn" title="Silenciar / Activar sonido" class="text-zinc-300 hover:text-red-400 transition p-1">
+                    <i id="volumeIcon" data-lucide="volume-2" class="w-4 h-4"></i>
+                </button>
+                <input id="volumeSlider" type="range" min="0" max="1" step="0.05" value="0.7" class="w-16 sm:w-20 accent-red-600 cursor-pointer h-1.5 bg-zinc-700 rounded-lg">
+            </div>
+
+            <!-- Selector de Fondo OBS -->
+            <button id="bgModeBtn" title="Cambiar fondo para OBS (Oscuro / Croma Verde / Transparente)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-xs font-medium text-zinc-200 transition">
+                <i data-lucide="monitor" class="w-4 h-4 text-emerald-400"></i>
+                <span id="bgModeLabel" class="hidden md:inline">Fondo: Oscuro</span>
+            </button>
+
+            <!-- Botón Modo Limpio (Oculta barras para capturar solo la ruleta) -->
+            <button id="cleanModeBtn" title="Modo OBS Limpio (Ocultar interfaz)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-xs font-medium text-zinc-200 transition">
+                <i data-lucide="eye-off" class="w-4 h-4 text-amber-400"></i>
+                <span class="hidden md:inline">Modo OBS</span>
+            </button>
+
+            <!-- Botón Abrir Panel de Asesinos -->
+            <button id="toggleDrawerBtn" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-red-700 hover:bg-red-600 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-red-900/40 transition">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Asesinos & Fotos</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Botón flotante para salir del Modo OBS Limpio -->
+    <button id="exitCleanModeBtn" class="hidden fixed top-4 right-4 z-50 px-3 py-2 rounded-xl bg-zinc-900/85 hover:bg-red-700 text-zinc-200 hover:text-white border border-zinc-700 text-xs font-medium backdrop-blur-md shadow-xl transition flex items-center gap-1.5">
+        <i data-lucide="eye" class="w-4 h-4"></i>
+        <span>Mostrar Controles</span>
+    </button>
+
+    <!-- Área Principal de la Ruleta -->
+    <main class="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 relative select-none">
+        
+        <!-- Contenedor Responsivo del Canvas de la Ruleta -->
+        <div id="wheelContainer" class="relative flex items-center justify-center w-full max-w-[660px] aspect-square">
+            
+            <!-- Resplandor exterior -->
+            <div class="absolute inset-4 rounded-full bg-red-600/10 blur-2xl pointer-events-none"></div>
+
+            <!-- Canvas Principal -->
+            <canvas id="rouletteCanvas" class="w-full h-full cursor-pointer drop-shadow-[0_15px_35px_rgba(0,0,0,0.85)]"></canvas>
+
+            <!-- Botón Central de Giro (Ganchos del Ente / Cráneo) -->
+            <button id="spinCenterBtn" class="absolute w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-4 border-red-600 flex flex-col items-center justify-center text-white font-dbd font-black tracking-wider shadow-2xl glow-blood hover:scale-105 active:scale-95 transition-transform z-10 cursor-pointer group">
+                <span class="text-xs sm:text-sm text-red-500 group-hover:text-red-400 transition">GIRAR</span>
+                <i data-lucide="flame" class="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 mt-0.5 group-hover:animate-bounce"></i>
+            </button>
+        </div>
+
+        <!-- Botón Inferior Alternativo y Estado -->
+        <div id="bottomControls" class="mt-4 flex flex-col items-center gap-2 z-10">
+            <button id="spinMainBtn" class="px-8 py-3 rounded-2xl bg-gradient-to-r from-red-800 via-red-600 to-red-800 hover:from-red-700 hover:via-red-500 hover:to-red-700 text-white font-dbd font-bold text-base sm:text-lg tracking-widest uppercase border border-red-400/30 shadow-xl shadow-red-950/60 hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5">
+                <i data-lucide="dices" class="w-5 h-5"></i>
+                <span>INVOCAR ASESINO</span>
+            </button>
+            <p id="statusHint" class="text-xs text-zinc-400 bg-zinc-950/60 px-3 py-1 rounded-full border border-zinc-800/80">
+                Haz clic en la ruleta o pulsa <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-200">ESPACIO</kbd> para girar
+            </p>
+        </div>
+    </main>
+
+    <!-- Panel Lateral Deslizable (Drawer) para Gestionar Asesinos e Imágenes -->
+    <aside id="killerDrawer" class="fixed inset-y-0 right-0 w-full sm:w-[460px] bg-zinc-950/95 backdrop-blur-xl border-l border-red-900/50 shadow-2xl z-40 transform translate-x-full transition-transform duration-300 flex flex-col">
+        
+        <!-- Cabecera del Drawer -->
+        <div class="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60">
+            <div>
+                <h2 class="font-dbd font-bold text-lg text-white flex items-center gap-2">
+                    <i data-lucide="swords" class="w-5 h-5 text-red-500"></i>
+                    Plantilla de Asesinos
+                </h2>
+                <p class="text-xs text-zinc-400">Activa DLCs, sube retratos o arrastra para reordenar</p>
+            </div>
+            <button id="closeDrawerBtn" class="p-2 rounded-xl bg-zinc-800 hover:bg-red-700 text-zinc-300 hover:text-white transition">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Opciones Rápidas y Modo Eliminación -->
+        <div class="p-3.5 bg-zinc-900/40 border-b border-zinc-800/80 space-y-3">
+            <!-- Buscador -->
+            <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                <input id="searchKillerInput" type="text" placeholder="Buscar asesino (ej. Wesker, Cazadora, Ghoul...)" class="w-full pl-9 pr-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700/80 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500">
+            </div>
+
+            <!-- Botones de Selección Masiva -->
+            <div class="grid grid-cols-2 gap-2">
+                <button id="selectAllBtn" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-emerald-400 border border-zinc-700 transition flex items-center justify-center gap-1.5">
+                    <i data-lucide="check-square" class="w-3.5 h-3.5"></i>
+                    Seleccionar Todos
+                </button>
+                <button id="deselectAllBtn" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-rose-400 border border-zinc-700 transition flex items-center justify-center gap-1.5">
+                    <i data-lucide="square" class="w-3.5 h-3.5"></i>
+                    Deseleccionar Todos
+                </button>
+            </div>
+
+            <!-- Toggle Modo Eliminación Automática -->
+            <label class="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 cursor-pointer hover:border-red-900/60 transition">
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="trash-2" class="w-4 h-4 text-orange-500"></i>
+                    <div>
+                        <span class="text-xs font-semibold text-zinc-200 block">Eliminar ganador automáticamente</span>
+                        <span class="text-[11px] text-zinc-400">Ideal para retos de racha sin repetir asesino</span>
+                    </div>
+                </div>
+                <input id="autoEliminateToggle" type="checkbox" class="w-4 h-4 accent-red-600 rounded cursor-pointer">
+            </label>
+
+            <!-- Subida en lote y añadir nuevo -->
+            <div class="grid grid-cols-2 gap-2">
+                <label class="py-2 px-3 rounded-xl bg-red-950/60 hover:bg-red-900/60 text-xs font-semibold text-red-200 border border-red-800/60 transition flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                    <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                    <span>Subir Fotos (Lote)</span>
+                    <input id="batchUploadInput" type="file" accept="image/*" multiple class="hidden">
+                </label>
+                <button id="openAddCustomBtn" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-amber-300 border border-zinc-700 transition flex items-center justify-center gap-1.5">
+                    <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+                    <span>Nuevo Asesino</span>
+                </button>
+            </div>
+
+            <!-- Formulario colapsable para añadir asesino personalizado -->
+            <form id="addCustomForm" class="hidden p-3.5 rounded-xl bg-zinc-900 border border-amber-500/40 space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">+ Añadir Asesino Personalizado</span>
+                    <button type="button" id="cancelCustomBtn" class="text-zinc-400 hover:text-white text-xs">Cancelar</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input id="customNameInput" type="text" required placeholder="Nombre (ej. Springtrap)" class="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-white focus:border-amber-500 focus:outline-none">
+                    <input id="customAliasInput" type="text" placeholder="Apodo / Identidad (opcional)" class="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-white focus:border-amber-500 focus:outline-none">
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-zinc-300 shrink-0 cursor-pointer" title="Color del segmento en la ruleta">
+                        <span>Color</span>
+                        <input id="customColorInput" type="color" value="#7f1d1d" class="w-5 h-5 rounded cursor-pointer bg-transparent border-0 p-0">
+                    </label>
+                    <input id="customImageInput" type="file" accept="image/*" class="text-xs text-zinc-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 w-full">
+                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shrink-0">Añadir</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Lista de Asesinos -->
+        <div id="killersListContainer" class="flex-1 overflow-y-auto p-3 space-y-2">
+            <!-- Renderizado dinámicamente por JS -->
+        </div>
+
+        <!-- Pie del Drawer: Restaurar por defecto con confirmación en línea -->
+        <div class="p-3 border-t border-zinc-800 bg-zinc-900/80 flex flex-col gap-2 text-xs text-zinc-400">
+            <div class="flex items-center justify-between">
+                <span id="drawerSummaryText">39 asesinos disponibles</span>
+                <button id="resetAllDataBtn" class="text-rose-400 hover:text-rose-300 underline flex items-center gap-1">
+                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                    Restaurar valores por defecto
+                </button>
+            </div>
+            <div id="resetConfirmBar" class="hidden flex items-center justify-between gap-2 p-2 rounded-xl bg-rose-950/70 border border-rose-700/60 text-rose-200">
+                <span class="text-[11px] font-medium">¿Restaurar todos los nombres, fotos y colores originales?</span>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button id="confirmResetYesBtn" class="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px]">Sí, restaurar</button>
+                    <button id="confirmResetNoBtn" class="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px]">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Modal Dramático del Asesino Seleccionado -->
+    <div id="winnerModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div class="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border-2 border-red-600/80 p-6 sm:p-8 text-center shadow-[0_0_60px_rgba(220,38,38,0.55)] animate-slash-in">
+            
+            <!-- Botón rápido Editar Personaje en esquina superior -->
+            <button id="editWinnerBtn" title="Editar nombre, apodo o foto de este personaje" aria-label="Editar personaje" class="absolute top-4 right-4 p-2.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-amber-400 border border-zinc-700/80 transition flex items-center justify-center">
+                <i data-lucide="pencil" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Adorno superior -->
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/90 border border-red-600/50 text-red-400 text-xs font-bold uppercase tracking-widest mb-4">
+                <i data-lucide="skull" class="w-3.5 h-3.5"></i>
+                <span>El Ente ha elegido</span>
+            </div>
+
+            <!-- Retrato Grande del Ganador -->
+            <div class="relative w-40 h-40 sm:w-48 sm:h-48 mx-auto mb-5 rounded-2xl overflow-hidden border-4 border-red-600 shadow-2xl shadow-red-950 bg-zinc-900">
+                <img id="winnerPortraitImg" src="" alt="Asesino seleccionado" class="w-full h-full object-cover">
+                <div class="absolute inset-0 ring-1 ring-inset ring-white/15 rounded-xl pointer-events-none"></div>
+            </div>
+
+            <!-- Nombre y Título -->
+            <h3 id="winnerNameTitle" class="font-dbd font-black text-2xl sm:text-3xl text-white tracking-wide drop-shadow">
+                El Trampero
+            </h3>
+            <p id="winnerSubtitle" class="text-sm text-red-400/90 font-medium mt-1">
+                Evan MacMillan
+            </p>
+
+            <div class="scratch-divider my-6"></div>
+
+            <!-- Botones de Acción -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button id="spinAgainBtn" class="flex-1 py-3 px-4 rounded-xl bg-red-700 hover:bg-red-600 text-white font-bold text-sm shadow-lg shadow-red-900/50 transition flex items-center justify-center gap-2">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    <span>Girar de nuevo</span>
+                </button>
+                <button id="eliminateAndContinueBtn" class="flex-1 py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-sm border border-zinc-700 transition flex items-center justify-center gap-2">
+                    <i data-lucide="user-minus" class="w-4 h-4 text-orange-400"></i>
+                    <span>Quitar y seguir</span>
+                </button>
+            </div>
+            
+            <button id="closeWinnerModalBtn" class="mt-3 px-4 py-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white text-[11px] font-medium border border-zinc-700/80 transition">
+                Cerrar ventana
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Edición Completa de Personaje -->
+    <div id="editKillerModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+        <div class="relative w-full max-w-lg rounded-3xl bg-zinc-950 border border-red-800/70 p-5 sm:p-6 shadow-[0_0_50px_rgba(220,38,38,0.35)] animate-slash-in max-h-[92vh] overflow-y-auto">
+            
+            <!-- Encabezado -->
+            <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-red-950 border border-red-700/60 flex items-center justify-center text-red-400">
+                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-dbd font-bold text-base sm:text-lg text-white leading-tight">Editar Asesino</h3>
+                        <p class="text-[11px] text-zinc-400">Personaliza nombre, apodo, color y retrato</p>
+                    </div>
+                </div>
+                <button type="button" id="closeEditModalBtn" class="p-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Vista previa en tiempo real (Retrato + Segmento de Ruleta) -->
+            <div class="mt-4 p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex flex-col sm:flex-row items-center gap-4">
+                <!-- Zona de Drop y Vista previa del Retrato -->
+                <div id="editPortraitDropZone" class="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-red-500/80 shadow-lg shrink-0 group cursor-pointer bg-zinc-950" title="Arrastra o haz clic para cambiar foto">
+                    <img id="editPreviewImg" src="" alt="Vista previa" class="w-full h-full object-cover">
+                    <label class="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[10px] font-semibold cursor-pointer transition text-center px-1">
+                        <i data-lucide="camera" class="w-4 h-4 mb-0.5"></i>
+                        <span>Cambiar</span>
+                        <input id="editImageFileInput" type="file" accept="image/*" class="hidden">
+                    </label>
+                </div>
+
+                <!-- Simulación en tiempo real de cómo se verá en la ruleta -->
+                <div class="flex-1 w-full min-w-0 space-y-2">
+                    <span class="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold block">Vista previa en la ruleta</span>
+                    <div id="editSegmentPreviewBar" class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-red-500/40 shadow-inner transition-colors" style="background: linear-gradient(90deg, #09090b 0%, #7f1d1d 65%, #18181b 100%);">
+                        <div class="min-w-0">
+                            <p id="editPreviewNameText" class="text-sm font-bold text-white truncate drop-shadow">El Trampero</p>
+                            <p id="editPreviewAliasText" class="text-[11px] text-zinc-300/90 truncate">Evan MacMillan</p>
+                        </div>
+                        <img id="editPreviewMiniCircle" src="" alt="" class="w-9 h-9 rounded-full object-cover border-2 border-amber-400 shrink-0">
+                    </div>
+
+                    <!-- Botones de imagen -->
+                    <div class="flex flex-wrap items-center gap-2 pt-0.5">
+                        <label class="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium cursor-pointer transition flex items-center gap-1.5 border border-zinc-700">
+                            <i data-lucide="upload" class="w-3.5 h-3.5 text-red-400"></i>
+                            <span>Subir imagen</span>
+                            <input id="editImageBtnInput" type="file" accept="image/*" class="hidden">
+                        </label>
+                        <button type="button" id="editRestorePortraitBtn" class="hidden px-2.5 py-1 rounded-lg bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 text-xs font-medium transition flex items-center gap-1 border border-amber-700/50">
+                            <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                            <span>Restaurar retrato original</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulario de Campos -->
+            <form id="editKillerForm" class="mt-4 space-y-3.5">
+                <div>
+                    <label for="editNameInput" class="block text-xs font-semibold text-zinc-300 mb-1">Nombre / Título del asesino</label>
+                    <input id="editNameInput" type="text" required maxlength="36" placeholder="Ej. El Trampero, La Cazadora..." class="w-full px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-sm text-white focus:border-red-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label for="editAliasInput" class="block text-xs font-semibold text-zinc-300 mb-1">Apodo / Identidad</label>
+                    <input id="editAliasInput" type="text" maxlength="44" placeholder="Ej. Evan MacMillan, o un apodo del chat" class="w-full px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-sm text-white focus:border-red-500 focus:outline-none">
+                </div>
+
+                <!-- Selector de Color Temático + Paleta rápida -->
+                <div>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1.5">Color temático del segmento</label>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-700">
+                            <input id="editColorInput" type="color" value="#7f1d1d" class="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0">
+                            <span id="editColorHexLabel" class="text-xs font-mono text-zinc-300 uppercase">#7F1D1D</span>
+                        </div>
+                        <!-- Colores predefinidos DbD -->
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" data-color="#7f1d1d" class="preset-color-btn w-6 h-6 rounded-full bg-[#7f1d1d] border border-white/30 hover:scale-110 transition" title="Rojo Sangre"></button>
+                            <button type="button" data-color="#9a3412" class="preset-color-btn w-6 h-6 rounded-full bg-[#9a3412] border border-white/30 hover:scale-110 transition" title="Naranja Ente"></button>
+                            <button type="button" data-color="#581c87" class="preset-color-btn w-6 h-6 rounded-full bg-[#581c87] border border-white/30 hover:scale-110 transition" title="Púrpura Oscuro"></button>
+                            <button type="button" data-color="#1e3a8a" class="preset-color-btn w-6 h-6 rounded-full bg-[#1e3a8a] border border-white/30 hover:scale-110 transition" title="Azul Espectral"></button>
+                            <button type="button" data-color="#14532d" class="preset-color-btn w-6 h-6 rounded-full bg-[#14532d] border border-white/30 hover:scale-110 transition" title="Verde Plaga"></button>
+                            <button type="button" data-color="#18181b" class="preset-color-btn w-6 h-6 rounded-full bg-[#18181b] border border-white/30 hover:scale-110 transition" title="Negro Carbón"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones de acción del Modal de Edición -->
+                <div class="pt-3 border-t border-zinc-800 flex flex-wrap items-center justify-between gap-2">
+                    <button type="button" id="editDeleteCustomBtn" class="hidden px-3 py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900 text-rose-300 text-xs font-semibold border border-rose-800/60 transition flex items-center gap-1.5">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span>Eliminar personaje</span>
+                    </button>
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button type="button" id="cancelEditModalBtn" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs sm:text-sm font-semibold transition">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-5 py-2 rounded-xl bg-red-700 hover:bg-red-600 text-white text-xs sm:text-sm font-bold shadow-lg shadow-red-950/60 transition flex items-center gap-1.5">
+                            <i data-lucide="check" class="w-4 h-4"></i>
+                            <span>Guardar cambios</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notificación Toast Flotante (Reemplaza alert()) -->
+    <div id="toastNotification" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-zinc-900 border border-red-500/60 text-zinc-100 text-xs sm:text-sm font-medium shadow-2xl opacity-0 pointer-events-none transition-opacity duration-300 flex items-center gap-2">
+        <i data-lucide="info" class="w-4 h-4 text-red-400"></i>
+        <span id="toastMessage">Mensaje</span>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * BASE DE DATOS COMPLETA DE ASESINOS DE DEAD BY DAYLIGHT (ACTUALIZADA)
+         * ============================================================================
+         * Cada asesino cuenta con:
+         * - id: identificador único
+         * - name: Nombre oficial en español
+         * - alias: Identidad / Referencia
+         * - color: Color temático principal para la casilla y retrato
+         * - accent: Color secundario
+         * - glyph: Símbolo/emblema temático generado proceduralmente si no hay foto subida
+         */
+        const DEFAULT_KILLERS = [
+            { id: 'trapper', name: 'El Trampero', alias: 'Evan MacMillan', color: '#7f1d1d', accent: '#f59e0b', glyph: 'trap' },
+            { id: 'wraith', name: 'El Espectro', alias: 'Philip Ojomo', color: '#312e81', accent: '#94a3b8', glyph: 'bell' },
+            { id: 'hillbilly', name: 'El Pueblerino', alias: 'Max Thompson Jr.', color: '#78350f', accent: '#eab308', glyph: 'saw' },
+            { id: 'nurse', name: 'La Enfermera', alias: 'Sally Smithson', color: '#1e3a8a', accent: '#bae6fd', glyph: 'breath' },
+            { id: 'shape', name: 'La Forma', alias: 'Michael Myers', color: '#18181b', accent: '#e4e4e7', glyph: 'mask' },
+            { id: 'hag', name: 'La Bruja', alias: 'Lisa Sherwood', color: '#3f6212', accent: '#bef264', glyph: 'triangle' },
+            { id: 'doctor', name: 'El Doctor', alias: 'Herman Carter', color: '#1d4ed8', accent: '#38bdf8', glyph: 'spark' },
+            { id: 'huntress', name: 'La Cazadora', alias: 'Anna', color: '#881337', accent: '#fda4af', glyph: 'axe' },
+            { id: 'cannibal', name: 'El Caníbal', alias: 'Leatherface / Bubba', color: '#854d0e', accent: '#fde047', glyph: 'saw' },
+            { id: 'nightmare', name: 'La Pesadilla', alias: 'Freddy Krueger', color: '#991b1b', accent: '#166534', glyph: 'claws' },
+            { id: 'pig', name: 'La Cerda', alias: 'Amanda Young', color: '#701a75', accent: '#f43f5e', glyph: 'gear' },
+            { id: 'clown', name: 'El Payaso', alias: 'Kenneth Chase', color: '#581c87', accent: '#a855f7', glyph: 'bottle' },
+            { id: 'spirit', name: 'El Espíritu', alias: 'Rin Yamaoka', color: '#1e1b4b', accent: '#60a5fa', glyph: 'katana' },
+            { id: 'legion', name: 'La Legión', alias: 'Frank, Julie, Susie, Joey', color: '#9f1239', accent: '#fb7185', glyph: 'smile' },
+            { id: 'plague', name: 'La Plaga', alias: 'Adiris', color: '#365314', accent: '#a3e635', glyph: 'censer' },
+            { id: 'ghostface', name: 'Ghost Face', alias: 'Danny Johnson', color: '#09090b', accent: '#f4f4f5', glyph: 'ghost' },
+            { id: 'demogorgon', name: 'El Demogorgon', alias: 'El Otro Lado', color: '#7f1d1d', accent: '#f87171', glyph: 'petal' },
+            { id: 'oni', name: 'El Oni', alias: 'Kazan Yamaoka', color: '#991b1b', accent: '#fbbf24', glyph: 'oni' },
+            { id: 'deathslinger', name: 'El Arponero', alias: 'Caleb Quinn', color: '#713f12', accent: '#fdba74', glyph: 'harpoon' },
+            { id: 'executioner', name: 'El Verdugo', alias: 'Pyramid Head', color: '#450a0a', accent: '#dc2626', glyph: 'pyramid' },
+            { id: 'blight', name: 'El Deterioro', alias: 'Talbot Grimes', color: '#9a3412', accent: '#fb923c', glyph: 'serum' },
+            { id: 'twins', name: 'Los Gemelos', alias: 'Charlotte y Victor', color: '#3f3f46', accent: '#d4d4d8', glyph: 'twins' },
+            { id: 'trickster', name: 'El Traicionero', alias: 'Ji-Woon Hak', color: '#be185d', accent: '#facc15', glyph: 'knives' },
+            { id: 'nemesis', name: 'Némesis', alias: 'Arma Biológica T-Type', color: '#1e3a8a', accent: '#ef4444', glyph: 'bio' },
+            { id: 'cenobite', name: 'El Cenobita', alias: 'Pinhead', color: '#172554', accent: '#93c5fd', glyph: 'box' },
+            { id: 'artist', name: 'La Artista', alias: 'Carmina Mora', color: '#18181b', accent: '#f59e0b', glyph: 'crow' },
+            { id: 'onryo', name: 'La Onryō', alias: 'Sadako Yamamura', color: '#064e3b', accent: '#6ee7b7', glyph: 'ring' },
+            { id: 'dredge', name: 'La Draga', alias: 'La Oscuridad', color: '#27272a', accent: '#a855f7', glyph: 'void' },
+            { id: 'mastermind', name: 'El Cerebro', alias: 'Albert Wesker', color: '#450a0a', accent: '#f97316', glyph: 'uroboros' },
+            { id: 'knight', name: 'El Caballero', alias: 'Tarhos Kovács', color: '#14532d', accent: '#86efac', glyph: 'helmet' },
+            { id: 'skullmerchant', name: 'Comerciante Calaveras', alias: 'Adriana Imai', color: '#4c1d95', accent: '#f472b6', glyph: 'drone' },
+            { id: 'singularity', name: 'La Singularidad', alias: 'HUX-A7-13', color: '#164e63', accent: '#22d3ee', glyph: 'eye' },
+            { id: 'xenomorph', name: 'El Xenomorfo', alias: 'Organismo Perfecto', color: '#020617', accent: '#4ade80', glyph: 'xeno' },
+            { id: 'goodguy', name: 'El Chico Bueno', alias: 'Chucky', color: '#1d4ed8', accent: '#dc2626', glyph: 'chucky' },
+            { id: 'unknown', name: 'Lo Desconocido', alias: 'El Ente Desconocido', color: '#4c0519', accent: '#fda4af', glyph: 'unknown' },
+            { id: 'lich', name: 'El Liche', alias: 'Vecna', color: '#3b0764', accent: '#c084fc', glyph: 'd20' },
+            { id: 'darklord', name: 'El Señor Oscuro', alias: 'Drácula', color: '#7f1d1d', accent: '#fde047', glyph: 'fangs' },
+            { id: 'houndmaster', name: 'Maestra de Sabuesos', alias: 'Portia Maye', color: '#7c2d12', accent: '#fdba74', glyph: 'hound' },
+            { id: 'ghoul', name: 'El Ghoul', alias: 'Ken Kaneki', color: '#881337', accent: '#ef4444', glyph: 'kagune' }
+        ];
+
+        /**
+         * ============================================================================
+         * MOTOR DE AUDIO SINTETIZADO (WEB AUDIO API - SIN ARCHIVOS EXTERNOS)
+         * ============================================================================
+         */
+        class HorrorSoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.volume = 0.7;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            // Sonido metálico/madera al pasar cada clavija de la ruleta
+            playTick(speedRatio = 1) {
+                if (this.muted || this.volume <= 0) return;
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'triangle';
+                    // Tono ligeramente más agudo cuando va rápido
+                    const baseFreq = 260 + Math.min(speedRatio * 180, 260);
+                    osc.frequency.setValueAtTime(baseFreq, now);
+                    osc.frequency.exponentialRampToValueAtTime(75, now + 0.045);
+
+                    gain.gain.setValueAtTime(this.volume * 0.35, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } catch (e) { /* Ignorar errores de autoplay antes de interacción */ }
+            }
+
+            // Acorde terrorífico estilo Dead by Daylight al revelar al ganador
+            playTerrorReveal() {
+                if (this.muted || this.volume <= 0) return;
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    
+                    // Frecuencias disonantes (tritono + subgrave)
+                    const freqs = [55, 110, 155.56, 220, 311.13];
+                    
+                    freqs.forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        const filter = this.ctx.createBiquadFilter();
+
+                        osc.type = idx < 2 ? 'sawtooth' : 'triangle';
+                        osc.frequency.setValueAtTime(freq, now);
+                        // Ligero deslizamiento de terror
+                        osc.frequency.linearRampToValueAtTime(freq * 0.96, now + 1.8);
+
+                        filter.type = 'lowpass';
+                        filter.frequency.setValueAtTime(900, now);
+                        filter.frequency.exponentialRampToValueAtTime(180, now + 1.9);
+
+                        gain.gain.setValueAtTime(0.001, now);
+                        gain.gain.linearRampToValueAtTime(this.volume * (idx === 0 ? 0.35 : 0.16), now + 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.0);
+
+                        osc.connect(filter);
+                        filter.connect(gain);
+                        gain.connect(this.ctx.destination);
+
+                        osc.start(now);
+                        osc.stop(now + 2.1);
+                    });
+                } catch (e) {}
+            }
+        }
+
+        const soundEngine = new HorrorSoundEngine();
+
+        /**
+         * ============================================================================
+         * GENERADOR PROCEDURAL DE RETRATOS ESTILIZADOS (CANVAS -> DATA URL)
+         * ============================================================================
+         * Crea avatares artísticos oscuros con emblemas únicos para cada asesino
+         * para que la ruleta luzca increíble desde el primer segundo.
+         */
+        function generateStylizedPortrait(killer) {
+            const size = 240;
+            const c = document.createElement('canvas');
+            c.width = size;
+            c.height = size;
+            const ctx = c.getContext('2d');
+
+            // 1. Fondo radial oscuro con el color del asesino
+            const grad = ctx.createRadialGradient(size * 0.5, size * 0.35, 10, size * 0.5, size * 0.5, size * 0.75);
+            grad.addColorStop(0, killer.accent + '55');
+            grad.addColorStop(0.55, killer.color);
+            grad.addColorStop(1, '#09090b');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, size, size);
+
+            // 2. Textura de rasguños / niebla
+            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 6; i++) {
+                ctx.beginPath();
+                ctx.moveTo(20 + i * 35, 0);
+                ctx.lineTo(i * 30, size);
+                ctx.stroke();
+            }
+
+            // 3. Silueta de busto sombrío en la base
+            ctx.fillStyle = 'rgba(9, 9, 11, 0.72)';
+            ctx.beginPath();
+            ctx.arc(size / 2, size * 0.44, 46, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(size / 2, size * 0.92, 82, 58, 0, Math.PI, 0);
+            ctx.fill();
+
+            // 4. Emblema / Icono central característico
+            ctx.save();
+            ctx.translate(size / 2, size * 0.46);
+            ctx.strokeStyle = killer.accent;
+            ctx.fillStyle = killer.accent;
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.shadowColor = killer.accent;
+            ctx.shadowBlur = 16;
+
+            switch (killer.glyph) {
+                case 'trap': // Cepo dentado
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 38, 0, Math.PI * 2);
+                    ctx.stroke();
+                    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+                        ctx.beginPath();
+                        ctx.moveTo(Math.cos(a) * 38, Math.sin(a) * 38);
+                        ctx.lineTo(Math.cos(a) * 24, Math.sin(a) * 24);
+                        ctx.stroke();
+                    }
+                    break;
+                case 'pyramid': // Cabeza piramidal
+                    ctx.beginPath();
+                    ctx.moveTo(0, -45);
+                    ctx.lineTo(42, 32);
+                    ctx.lineTo(-42, 32);
+                    ctx.closePath();
+                    ctx.stroke();
+                    break;
+                case 'ring': // Aro maldito de Sadako
+                    ctx.lineWidth = 7;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 36, 0, Math.PI * 2);
+                    ctx.stroke();
+                    break;
+                case 'claws': // Garras de Freddy
+                    for (let x = -24; x <= 24; x += 16) {
+                        ctx.beginPath();
+                        ctx.moveTo(x - 6, -36);
+                        ctx.quadraticCurveTo(x + 8, 0, x - 4, 38);
+                        ctx.stroke();
+                    }
+                    break;
+                case 'd20': // Dado de 20 caras (Vecna)
+                    ctx.beginPath();
+                    for (let i = 0; i < 6; i++) {
+                        const ang = (i * Math.PI) / 3 - Math.PI / 2;
+                        const px = Math.cos(ang) * 42;
+                        const py = Math.sin(ang) * 42;
+                        if (i === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                    break;
+                case 'kagune': // Tentáculos / Ojo Ghoul
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 26, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 11, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                default: // Ojos brillantes amenazantes + Iniciales
+                    ctx.beginPath();
+                    ctx.moveTo(-28, -8);
+                    ctx.lineTo(-10, -2);
+                    ctx.lineTo(-24, 4);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(28, -8);
+                    ctx.lineTo(10, -2);
+                    ctx.lineTo(24, 4);
+                    ctx.closePath();
+                    ctx.fill();
+                    break;
+            }
+            ctx.restore();
+
+            // 5. Iniciales estilizadas en la parte inferior
+            const initials = killer.name
+                .replace(/^(El|La|Los|Lo)\s+/i, '')
+                .substring(0, 2)
+                .toUpperCase();
+            ctx.font = '900 34px Cinzel, serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowBlur = 8;
+            ctx.fillText(initials, size / 2, size * 0.86);
+
+            // 6. Marco interior sutil
+            ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(2, 2, size - 4, size - 4);
+
+            return c.toDataURL('image/png');
+        }
+
+        /**
+         * ============================================================================
+         * GESTIÓN DE ESTADO Y PERSISTENCIA EN LOCALSTORAGE
+         * ============================================================================
+         */
+        const STORAGE_KEY = 'dbd_roulette_killers_v1';
+        const SETTINGS_KEY = 'dbd_roulette_settings_v1';
+
+        let killers = [];
+        const imageCache = new Map(); // Almacena objetos HTMLImageElement cargados
+
+        let settings = {
+            autoEliminate: false,
+            volume: 0.7,
+            muted: false,
+            bgMode: 'dark' // 'dark' | 'chroma' | 'transparent'
+        };
+
+        // Cargar datos guardados o inicializar
+        function loadState() {
+            try {
+                const savedSettings = localStorage.getItem(SETTINGS_KEY);
+                if (savedSettings) {
+                    settings = { ...settings, ...JSON.parse(savedSettings) };
+                }
+
+                const savedKillers = localStorage.getItem(STORAGE_KEY);
+                if (savedKillers) {
+                    killers = JSON.parse(savedKillers);
+                } else {
+                    killers = DEFAULT_KILLERS.map(k => ({
+                        ...k,
+                        active: true,
+                        customImage: null,
+                        defaultImage: generateStylizedPortrait(k)
+                    }));
+                    saveKillers();
+                }
+            } catch (err) {
+                console.error('Error cargando localStorage:', err);
+                killers = DEFAULT_KILLERS.map(k => ({
+                    ...k,
+                    active: true,
+                    customImage: null,
+                    defaultImage: generateStylizedPortrait(k)
+                }));
+            }
+
+            // Precargar imágenes en caché para el Canvas
+            killers.forEach(k => preloadKillerImage(k));
+        }
+
+        function saveKillers() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(killers));
+                return true;
+            } catch (e) {
+                // Si el navegador alcanza el límite de 5MB al subir muchos retratos juntos, recomprimir automáticamente
+                try {
+                    const compactKillers = killers.map(k => ({
+                        ...k,
+                        defaultImage: null // El retrato por defecto se regenera dinámicamente al vuelo sin ocupar espacio
+                    }));
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(compactKillers));
+                    return true;
+                } catch (e2) {
+                    showToast('Aviso: Límite de almacenamiento del navegador alcanzado.');
+                    return false;
+                }
+            }
+        }
+
+        function saveSettings() {
+            try {
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+            } catch (e) {}
+        }
+
+        function preloadKillerImage(killer, callback) {
+            if (!killer.defaultImage) {
+                killer.defaultImage = generateStylizedPortrait(killer);
+            }
+            const src = killer.customImage || killer.defaultImage;
+            const img = new Image();
+            img.onload = () => {
+                imageCache.set(killer.id, img);
+                drawWheel();
+                if (callback) callback();
+            };
+            img.onerror = () => {
+                const fallback = generateStylizedPortrait(killer);
+                const fallbackImg = new Image();
+                fallbackImg.onload = () => {
+                    imageCache.set(killer.id, fallbackImg);
+                    drawWheel();
+                };
+                fallbackImg.src = fallback;
+            };
+            img.src = src;
+        }
+
+        // Redimensionar y comprimir imágenes subidas por el usuario para permitir subir las 39+ fotos en lote sin llenar localStorage
+        function processUploadedImage(file, maxSize = 180) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = maxSize;
+                        canvas.height = maxSize;
+                        const ctx = canvas.getContext('2d');
+
+                        // Recorte cuadrado centrado (cover)
+                        const minDim = Math.min(img.width, img.height);
+                        const sx = (img.width - minDim) / 2;
+                        const sy = (img.height - minDim) / 2;
+
+                        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, maxSize, maxSize);
+                        resolve(canvas.toDataURL('image/webp', 0.8));
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        /**
+         * ============================================================================
+         * MOTOR GRÁFICO Y FÍSICA DE LA RULETA (HTML5 CANVAS)
+         * ============================================================================
+         */
+        const canvas = document.getElementById('rouletteCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let currentRotation = 0; // En radianes
+        let angularVelocity = 0;
+        let isSpinning = false;
+        let lastTickIndex = -1;
+        let pointerKickAngle = 0; // Rebote visual del puntero superior
+        let selectedWinner = null;
+
+        // Ajustar resolución nítida (Retina / HiDPI) responsiva
+        function resizeCanvas() {
+            const container = document.getElementById('wheelContainer');
+            const rect = container.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            drawWheel();
+        }
+
+        function getActiveKillers() {
+            return killers.filter(k => k.active);
+        }
+
+        function drawWheel() {
+            const rect = canvas.getBoundingClientRect();
+            const width = rect.width;
+            const height = rect.height;
+            if (width === 0 || height === 0) return;
+
+            const cx = width / 2;
+            const cy = height / 2;
+            const outerRadius = Math.min(cx, cy) - 18;
+            const wheelRadius = outerRadius - 12;
+
+            ctx.clearRect(0, 0, width, height);
+
+            const activeList = getActiveKillers();
+            const count = activeList.length;
+
+            // 1. Aro exterior metálico/sangriento con remaches
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
+            const rimGrad = ctx.createLinearGradient(0, cy - outerRadius, 0, cy + outerRadius);
+            rimGrad.addColorStop(0, '#3f3f46');
+            rimGrad.addColorStop(0.5, '#18181b');
+            rimGrad.addColorStop(1, '#7f1d1d');
+            ctx.fillStyle = rimGrad;
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#dc2626';
+            ctx.stroke();
+            ctx.restore();
+
+            // Si no hay asesinos activos
+            if (count === 0) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, wheelRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#121215';
+                ctx.fill();
+
+                ctx.fillStyle = '#a1a1aa';
+                ctx.font = '600 16px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('No hay asesinos seleccionados', cx, cy - 10);
+                ctx.font = '13px Inter, sans-serif';
+                ctx.fillStyle = '#ef4444';
+                ctx.fillText('Abre "Asesinos & Fotos" para activar', cx, cy + 16);
+                ctx.restore();
+                return;
+            }
+
+            const sliceAngle = (Math.PI * 2) / count;
+
+            // 2. Dibujar cada segmento de la ruleta
+            for (let i = 0; i < count; i++) {
+                const killer = activeList[i];
+                const startAngle = currentRotation + i * sliceAngle;
+                const endAngle = startAngle + sliceAngle;
+                const midAngle = startAngle + sliceAngle / 2;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, wheelRadius, startAngle, endAngle);
+                ctx.closePath();
+
+                // Gradiente oscuro alternado + color del asesino
+                const segGrad = ctx.createRadialGradient(cx, cy, wheelRadius * 0.15, cx, cy, wheelRadius);
+                segGrad.addColorStop(0, '#09090b');
+                segGrad.addColorStop(0.55, killer.color);
+                segGrad.addColorStop(1, i % 2 === 0 ? '#18181b' : '#0f0f12');
+                ctx.fillStyle = segGrad;
+                ctx.fill();
+
+                // Borde separador entre casillas
+                ctx.lineWidth = count > 25 ? 1 : 1.8;
+                ctx.strokeStyle = 'rgba(220, 38, 38, 0.45)';
+                ctx.stroke();
+                ctx.restore();
+
+                // 3. Dibujar Retrato Circular cerca del borde exterior
+                const img = imageCache.get(killer.id);
+                // Ajustar tamaño del retrato dinámicamente según cantidad de asesinos
+                const maxPortraitRadius = Math.min(
+                    wheelRadius * 0.135,
+                    (wheelRadius * 0.82 * Math.sin(sliceAngle / 2)) * 0.85
+                );
+                const portraitRadius = Math.max(11, maxPortraitRadius);
+                const portraitDist = wheelRadius - portraitRadius - 10;
+
+                const px = cx + Math.cos(midAngle) * portraitDist;
+                const py = cy + Math.sin(midAngle) * portraitDist;
+
+                ctx.save();
+                ctx.translate(px, py);
+                // Orientar el retrato hacia el centro
+                ctx.rotate(midAngle + Math.PI / 2);
+
+                // Recorte circular para el retrato
+                ctx.beginPath();
+                ctx.arc(0, 0, portraitRadius, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.fillStyle = '#09090b';
+                ctx.fill();
+                ctx.clip();
+
+                if (img) {
+                    ctx.drawImage(img, -portraitRadius, -portraitRadius, portraitRadius * 2, portraitRadius * 2);
+                }
+
+                // Aro dorado/sangre alrededor del retrato
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = killer.accent || '#ef4444';
+                ctx.stroke();
+                ctx.restore();
+
+                // 4. Texto del nombre del asesino (radial hacia el centro)
+                if (count <= 45) {
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    ctx.rotate(midAngle);
+
+                    const textRadius = portraitDist - portraitRadius - 8;
+                    const fontSize = count > 30 ? 9.5 : count > 20 ? 11 : count > 12 ? 13 : 15;
+                    ctx.font = `700 ${fontSize}px Inter, sans-serif`;
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+
+                    // Acortar nombre si es muy largo
+                    let label = killer.name;
+                    if (count > 24 && label.length > 14) {
+                        label = label.replace(/^(El|La|Los|Lo)\s+/i, '');
+                    }
+
+                    ctx.fillStyle = '#f4f4f5';
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText(label, textRadius, 0);
+                    ctx.restore();
+                }
+
+                // 5. Clavija metálica en cada división
+                const pinX = cx + Math.cos(startAngle) * (wheelRadius - 3);
+                const pinY = cy + Math.sin(startAngle) * (wheelRadius - 3);
+                ctx.beginPath();
+                ctx.arc(pinX, pinY, count > 30 ? 2 : 3.2, 0, Math.PI * 2);
+                ctx.fillStyle = '#fca5a5';
+                ctx.fill();
+            }
+
+            // 6. Dibujar Puntero Superior (Gancho del Ente) con física de rebote
+            drawPointer(cx, cy - outerRadius + 4);
+        }
+
+        function drawPointer(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(pointerKickAngle);
+
+            // Sombra del puntero
+            ctx.shadowColor = 'rgba(220, 38, 38, 0.85)';
+            ctx.shadowBlur = 14;
+
+            // Forma de garra / gancho afilado apuntando hacia abajo
+            ctx.beginPath();
+            ctx.moveTo(-16, -12);
+            ctx.lineTo(16, -12);
+            ctx.lineTo(0, 28);
+            ctx.closePath();
+
+            const ptrGrad = ctx.createLinearGradient(0, -12, 0, 28);
+            ptrGrad.addColorStop(0, '#ef4444');
+            ptrGrad.addColorStop(0.6, '#b91c1c');
+            ptrGrad.addColorStop(1, '#fef08a');
+            ctx.fillStyle = ptrGrad;
+            ctx.fill();
+
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            // Remache superior
+            ctx.beginPath();
+            ctx.arc(0, -5, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#18181b';
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Calcular qué asesino está exactamente bajo el puntero superior (-PI/2)
+        function getKillerAtPointer() {
+            const activeList = getActiveKillers();
+            const count = activeList.length;
+            if (count === 0) return { killer: null, index: -1 };
+
+            const sliceAngle = (Math.PI * 2) / count;
+            // El puntero está arriba: ángulo = 1.5 * Math.PI (o -0.5 * Math.PI)
+            const pointerAngle = (Math.PI * 1.5);
+            const normalizedRot = ((currentRotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+            const relativeAngle = ((pointerAngle - normalizedRot) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+
+            const index = Math.floor(relativeAngle / sliceAngle) % count;
+            return { killer: activeList[index], index };
+        }
+
+        // Iniciar giro con impulso aleatorio realista
+        function startSpin() {
+            if (isSpinning) return;
+            const activeList = getActiveKillers();
+            if (activeList.length < 2) {
+                showToast(activeList.length === 0 
+                    ? 'Activa al menos 2 asesinos para girar la ruleta.' 
+                    : 'Activa al menos 2 asesinos para que haya azar.');
+                return;
+            }
+
+            soundEngine.init();
+            isSpinning = true;
+            lastTickIndex = -1;
+            // Velocidad angular inicial fuerte y aleatoria
+            angularVelocity = 0.36 + Math.random() * 0.24;
+            document.getElementById('statusHint').textContent = 'El Ente está decidiendo tu destino...';
+        }
+
+        // Bucle de animación a 60fps
+        function animateLoop() {
+            if (isSpinning) {
+                currentRotation += angularVelocity;
+                // Fricción progresiva realista (desacelera suavemente al final)
+                const friction = angularVelocity > 0.08 ? 0.988 : 0.982;
+                angularVelocity *= friction;
+
+                // Detectar cruce de clavijas para sonido y rebote del puntero
+                const { index } = getKillerAtPointer();
+                if (index !== -1 && index !== lastTickIndex) {
+                    lastTickIndex = index;
+                    soundEngine.playTick(angularVelocity * 2.5);
+                    // Impulso hacia la izquierda al puntero
+                    pointerKickAngle = -Math.min(0.45, 0.15 + angularVelocity * 0.8);
+                }
+
+                // Detener cuando la velocidad es mínima
+                if (angularVelocity < 0.0018) {
+                    angularVelocity = 0;
+                    isSpinning = false;
+                    onSpinFinished();
+                }
+            }
+
+            // Recuperación elástica del puntero superior
+            if (Math.abs(pointerKickAngle) > 0.001) {
+                pointerKickAngle *= 0.82;
+            } else {
+                pointerKickAngle = 0;
+            }
+
+            drawWheel();
+            requestAnimationFrame(animateLoop);
+        }
+
+        function onSpinFinished() {
+            const { killer } = getKillerAtPointer();
+            if (!killer) return;
+
+            selectedWinner = killer;
+            soundEngine.playTerrorReveal();
+            document.getElementById('statusHint').textContent = `Seleccionado: ${killer.name}`;
+
+            // Mostrar modal dramático
+            const modal = document.getElementById('winnerModal');
+            const imgEl = document.getElementById('winnerPortraitImg');
+            const nameEl = document.getElementById('winnerNameTitle');
+            const subEl = document.getElementById('winnerSubtitle');
+
+            imgEl.src = killer.customImage || killer.defaultImage;
+            nameEl.textContent = killer.name;
+            subEl.textContent = killer.alias || 'Asesino del Ente';
+
+            modal.classList.remove('hidden');
+
+            // Si está activado el modo eliminación automática
+            if (settings.autoEliminate) {
+                killer.active = false;
+                saveKillers();
+                renderKillersList();
+                updateActiveCounter();
+                showToast(`${killer.name} ha sido eliminado automáticamente de la ruleta.`);
+            }
+        }
+
+        /**
+         * ============================================================================
+         * INTERFAZ DE USUARIO, PANEL DE GESTIÓN Y EVENTOS
+         * ============================================================================
+         */
+        function updateActiveCounter() {
+            const activeCount = getActiveKillers().length;
+            document.getElementById('activeCountBadge').textContent = `${activeCount} / ${killers.length}`;
+            document.getElementById('drawerSummaryText').textContent = `${activeCount} activos de ${killers.length} asesinos`;
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastMessage').textContent = msg;
+            toast.classList.remove('opacity-0');
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 3200);
+        }
+
+        function renderKillersList(filterText = '') {
+            const container = document.getElementById('killersListContainer');
+            container.innerHTML = '';
+
+            const query = filterText.trim().toLowerCase();
+            const filtered = killers.filter(k => 
+                k.name.toLowerCase().includes(query) || 
+                (k.alias && k.alias.toLowerCase().includes(query))
+            );
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<p class="text-center text-xs text-zinc-500 py-8">No se encontraron asesinos con "${filterText}"</p>`;
+                return;
+            }
+
+            filtered.forEach(killer => {
+                const item = document.createElement('div');
+                item.dataset.id = killer.id;
+                item.draggable = !query; // Permitir arrastrar cuando no hay filtro activo
+                item.className = `killer-card flex items-center justify-between gap-2 p-2 rounded-xl border transition select-none ${
+                    killer.active 
+                        ? 'bg-zinc-900/90 border-zinc-700/80' 
+                        : 'bg-zinc-950/60 border-zinc-900 opacity-55'
+                }`;
+
+                const portraitSrc = killer.customImage || killer.defaultImage;
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <!-- Asa para arrastrar y reordenar -->
+                        <div class="drag-handle ${query ? 'opacity-25 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing text-zinc-500 hover:text-amber-400'} p-1 rounded transition shrink-0" title="${query ? 'Limpia el buscador para reordenar' : 'Arrastra para cambiar el orden en la ruleta'}">
+                            <i data-lucide="grip-vertical" class="w-4 h-4"></i>
+                        </div>
+
+                        <!-- Checkbox Activo -->
+                        <input type="checkbox" ${killer.active ? 'checked' : ''} data-id="${killer.id}" class="killer-toggle w-4 h-4 accent-red-600 rounded cursor-pointer shrink-0">
+                        
+                        <!-- Miniatura con indicador de color y soporte Drag & Drop individual -->
+                        <div class="relative w-11 h-11 rounded-lg overflow-hidden border-2 shrink-0 group cursor-pointer drop-zone" style="border-color: ${killer.color}" data-id="${killer.id}" title="Haz clic o arrastra una imagen aquí">
+                            <img src="${portraitSrc}" alt="${killer.name}" draggable="false" class="w-full h-full object-cover">
+                            <label class="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition">
+                                <i data-lucide="camera" class="w-4 h-4 text-white"></i>
+                                <input type="file" accept="image/*" data-id="${killer.id}" class="single-upload-input hidden">
+                            </label>
+                        </div>
+
+                        <!-- Nombre y Alias -->
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-zinc-100 truncate">${killer.name}</p>
+                            <p class="text-[11px] text-zinc-400 truncate">${killer.alias || 'Personalizado'}</p>
+                        </div>
+                    </div>
+
+                    <!-- Acciones: Editar personaje / Restaurar foto / Borrar -->
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button data-id="${killer.id}" class="edit-killer-btn p-1.5 rounded-lg bg-zinc-800 hover:bg-red-700 text-zinc-200 hover:text-white text-xs transition flex items-center gap-1" title="Editar nombre, apodo, color o foto">
+                            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                        </button>
+                        ${killer.customImage ? `
+                            <button data-id="${killer.id}" class="reset-img-btn p-1.5 rounded-lg bg-zinc-800 hover:bg-amber-900/60 text-amber-400 text-xs transition" title="Restaurar retrato original">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                            </button>
+                        ` : ''}
+                        ${killer.isCustom ? `
+                            <button data-id="${killer.id}" class="delete-custom-btn p-1.5 rounded-lg bg-zinc-800 hover:bg-rose-900/70 text-rose-400 text-xs transition" title="Eliminar asesino personalizado">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+
+                container.appendChild(item);
+            });
+
+            lucide.createIcons();
+            attachListEvents();
+        }
+
+        function attachListEvents() {
+            // Botón Editar personaje en cada tarjeta
+            document.querySelectorAll('.edit-killer-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    openEditKillerModal(id);
+                });
+            });
+
+            // Toggle activar/desactivar asesino
+            document.querySelectorAll('.killer-toggle').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const id = e.target.dataset.id;
+                    const killer = killers.find(k => k.id === id);
+                    if (killer) {
+                        killer.active = e.target.checked;
+                        saveKillers();
+                        updateActiveCounter();
+                        drawWheel();
+                        renderKillersList(document.getElementById('searchKillerInput').value);
+                    }
+                });
+            });
+
+            // Subir foto individual
+            document.querySelectorAll('.single-upload-input').forEach(input => {
+                input.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        await updateKillerPortrait(e.target.dataset.id, file);
+                    }
+                    e.target.value = '';
+                });
+            });
+
+            // Soporte Drag & Drop sobre la miniatura individual (subida de foto externa)
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    if (e.dataTransfer.types.includes('Files')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        zone.classList.add('ring-2', 'ring-red-500');
+                    }
+                });
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('ring-2', 'ring-red-500');
+                });
+                zone.addEventListener('drop', async (e) => {
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        zone.classList.remove('ring-2', 'ring-red-500');
+                        const file = e.dataTransfer.files[0];
+                        if (file && file.type.startsWith('image/')) {
+                            await updateKillerPortrait(zone.dataset.id, file);
+                        }
+                    }
+                });
+            });
+
+            // Reordenamiento de tarjetas por Drag & Drop (Ratón) y Touch
+            setupDragAndDropReordering();
+
+            // Restaurar retrato original en la lista
+            document.querySelectorAll('.reset-img-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    const killer = killers.find(k => k.id === id);
+                    if (killer) {
+                        killer.customImage = null;
+                        saveKillers();
+                        preloadKillerImage(killer);
+                        renderKillersList(document.getElementById('searchKillerInput').value);
+                        showToast(`Retrato restaurado para ${killer.name}.`);
+                    }
+                });
+            });
+
+            // Eliminar asesino personalizado desde la lista
+            document.querySelectorAll('.delete-custom-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    const killer = killers.find(k => k.id === id);
+                    if (killer) {
+                        killers = killers.filter(k => k.id !== id);
+                        imageCache.delete(id);
+                        saveKillers();
+                        updateActiveCounter();
+                        drawWheel();
+                        renderKillersList(document.getElementById('searchKillerInput').value);
+                        showToast(`Personaje "${killer.name}" eliminado.`);
+                    }
+                });
+            });
+        }
+
+        function moveKillerInOrder(draggedId, targetId, insertAfter = false) {
+            if (!draggedId || !targetId || draggedId === targetId) return;
+            const fromIndex = killers.findIndex(k => k.id === draggedId);
+            if (fromIndex === -1) return;
+
+            const [movedKiller] = killers.splice(fromIndex, 1);
+            let toIndex = killers.findIndex(k => k.id === targetId);
+            if (toIndex === -1) {
+                killers.splice(fromIndex, 0, movedKiller);
+                return;
+            }
+            if (insertAfter) toIndex += 1;
+            killers.splice(toIndex, 0, movedKiller);
+
+            saveKillers();
+            drawWheel();
+            renderKillersList(document.getElementById('searchKillerInput').value);
+        }
+
+        function setupDragAndDropReordering() {
+            const cards = document.querySelectorAll('.killer-card');
+            let draggedId = null;
+
+            const clearIndicators = () => {
+                cards.forEach(c => c.classList.remove('drag-over-top', 'drag-over-bottom', 'dragging'));
+            };
+
+            cards.forEach(card => {
+                // Eventos HTML5 Drag & Drop (Escritorio)
+                card.addEventListener('dragstart', (e) => {
+                    if (!card.draggable) {
+                        e.preventDefault();
+                        return;
+                    }
+                    draggedId = card.dataset.id;
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', draggedId);
+                    requestAnimationFrame(() => card.classList.add('dragging'));
+                });
+
+                card.addEventListener('dragover', (e) => {
+                    if (!draggedId || e.dataTransfer.types.includes('Files')) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (card.dataset.id === draggedId) return;
+
+                    const rect = card.getBoundingClientRect();
+                    const isAfter = (e.clientY - rect.top) > rect.height / 2;
+                    card.classList.remove('drag-over-top', 'drag-over-bottom');
+                    card.classList.add(isAfter ? 'drag-over-bottom' : 'drag-over-top');
+                });
+
+                card.addEventListener('dragleave', () => {
+                    card.classList.remove('drag-over-top', 'drag-over-bottom');
+                });
+
+                card.addEventListener('drop', (e) => {
+                    if (!draggedId || (e.dataTransfer.files && e.dataTransfer.files.length > 0)) return;
+                    e.preventDefault();
+                    const targetId = card.dataset.id;
+                    const rect = card.getBoundingClientRect();
+                    const isAfter = (e.clientY - rect.top) > rect.height / 2;
+                    clearIndicators();
+                    moveKillerInOrder(draggedId, targetId, isAfter);
+                    draggedId = null;
+                });
+
+                card.addEventListener('dragend', () => {
+                    clearIndicators();
+                    draggedId = null;
+                });
+
+                // Soporte táctil desde el asa de agarre (Móvil / Tablet)
+                const handle = card.querySelector('.drag-handle');
+                if (handle && card.draggable) {
+                    let touchTargetCard = null;
+                    let touchInsertAfter = false;
+
+                    handle.addEventListener('touchstart', (e) => {
+                        draggedId = card.dataset.id;
+                        card.classList.add('dragging');
+                    }, { passive: true });
+
+                    handle.addEventListener('touchmove', (e) => {
+                        if (!draggedId) return;
+                        e.preventDefault();
+                        const touch = e.touches[0];
+                        const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                        const overCard = elemBelow ? elemBelow.closest('.killer-card') : null;
+
+                        cards.forEach(c => c.classList.remove('drag-over-top', 'drag-over-bottom'));
+                        if (overCard && overCard.dataset.id !== draggedId) {
+                            const rect = overCard.getBoundingClientRect();
+                            touchInsertAfter = (touch.clientY - rect.top) > rect.height / 2;
+                            touchTargetCard = overCard;
+                            overCard.classList.add(touchInsertAfter ? 'drag-over-bottom' : 'drag-over-top');
+                        } else {
+                            touchTargetCard = null;
+                        }
+                    }, { passive: false });
+
+                    handle.addEventListener('touchend', () => {
+                        if (draggedId && touchTargetCard) {
+                            moveKillerInOrder(draggedId, touchTargetCard.dataset.id, touchInsertAfter);
+                        }
+                        clearIndicators();
+                        draggedId = null;
+                        touchTargetCard = null;
+                    });
+                }
+            });
+        }
+
+        async function updateKillerPortrait(id, file) {
+            const killer = killers.find(k => k.id === id);
+            if (!killer) return;
+            try {
+                killer.customImage = await processUploadedImage(file, 256);
+                saveKillers();
+                preloadKillerImage(killer);
+                renderKillersList(document.getElementById('searchKillerInput').value);
+                showToast(`Retrato actualizado para ${killer.name}.`);
+            } catch (err) {
+                showToast('Error al procesar la imagen.');
+            }
+        }
+
+        function applyBackgroundMode() {
+            const body = document.body;
+            const label = document.getElementById('bgModeLabel');
+            body.classList.remove('mode-chroma', 'mode-transparent');
+
+            if (settings.bgMode === 'chroma') {
+                body.classList.add('mode-chroma');
+                if (label) label.textContent = 'Fondo: Croma';
+            } else if (settings.bgMode === 'transparent') {
+                body.classList.add('mode-transparent');
+                if (label) label.textContent = 'Fondo: Transparente';
+            } else {
+                if (label) label.textContent = 'Fondo: Oscuro';
+            }
+        }
+
+        // ============================================================================
+        // LÓGICA DEL MODAL DE EDICIÓN COMPLETA DE PERSONAJE
+        // ============================================================================
+        let editingKillerId = null;
+        let editingTempCustomImage = undefined; // undefined = sin cambio, null = restaurado a default, string = nueva dataURL
+
+        function openEditKillerModal(killerId) {
+            const killer = killers.find(k => k.id === killerId);
+            if (!killer) return;
+
+            editingKillerId = killer.id;
+            editingTempCustomImage = undefined;
+
+            const modal = document.getElementById('editKillerModal');
+            const nameInput = document.getElementById('editNameInput');
+            const aliasInput = document.getElementById('editAliasInput');
+            const colorInput = document.getElementById('editColorInput');
+            const deleteBtn = document.getElementById('editDeleteCustomBtn');
+
+            nameInput.value = killer.name;
+            aliasInput.value = killer.alias || '';
+            colorInput.value = killer.color || '#7f1d1d';
+
+            // Mostrar botón de eliminar solo si fue creado por el usuario
+            if (killer.isCustom) {
+                deleteBtn.classList.remove('hidden');
+            } else {
+                deleteBtn.classList.add('hidden');
+            }
+
+            updateEditModalPreview();
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function updateEditModalPreview() {
+            const killer = killers.find(k => k.id === editingKillerId);
+            if (!killer) return;
+
+            const nameVal = document.getElementById('editNameInput').value.trim() || 'Sin nombre';
+            const aliasVal = document.getElementById('editAliasInput').value.trim() || 'Asesino del Ente';
+            const colorVal = document.getElementById('editColorInput').value || '#7f1d1d';
+
+            document.getElementById('editColorHexLabel').textContent = colorVal.toUpperCase();
+            document.getElementById('editPreviewNameText').textContent = nameVal;
+            document.getElementById('editPreviewAliasText').textContent = aliasVal;
+
+            // Actualizar barra de vista previa del segmento
+            const previewBar = document.getElementById('editSegmentPreviewBar');
+            previewBar.style.background = `linear-gradient(90deg, #09090b 0%, ${colorVal} 65%, #18181b 100%)`;
+
+            // Determinar qué imagen mostrar en la vista previa
+            let activeCustomImg = editingTempCustomImage !== undefined ? editingTempCustomImage : killer.customImage;
+            const previewDefault = generateStylizedPortrait({
+                ...killer,
+                name: nameVal,
+                color: colorVal
+            });
+            const srcToShow = activeCustomImg || previewDefault;
+
+            document.getElementById('editPreviewImg').src = srcToShow;
+            document.getElementById('editPreviewMiniCircle').src = srcToShow;
+
+            // Mostrar u ocultar botón "Restaurar retrato original"
+            const restoreBtn = document.getElementById('editRestorePortraitBtn');
+            if (activeCustomImg) {
+                restoreBtn.classList.remove('hidden');
+            } else {
+                restoreBtn.classList.add('hidden');
+            }
+        }
+
+        async function handleEditModalImageFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+            try {
+                editingTempCustomImage = await processUploadedImage(file, 256);
+                updateEditModalPreview();
+                showToast('Imagen cargada en la vista previa.');
+            } catch (err) {
+                showToast('No se pudo procesar la imagen seleccionada.');
+            }
+        }
+
+        // Configurar todos los listeners de la UI
+        function initUIEvents() {
+            // Girar ruleta
+            document.getElementById('spinCenterBtn').addEventListener('click', startSpin);
+            document.getElementById('spinMainBtn').addEventListener('click', startSpin);
+            canvas.addEventListener('click', startSpin);
+
+            // Tecla Espacio para girar
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+                    e.preventDefault();
+                    if (!document.getElementById('winnerModal').classList.contains('hidden')) {
+                        document.getElementById('winnerModal').classList.add('hidden');
+                    }
+                    startSpin();
+                }
+            });
+
+            // Audio: Volumen y Mute
+            const volSlider = document.getElementById('volumeSlider');
+            const muteBtn = document.getElementById('muteBtn');
+            volSlider.value = settings.volume;
+            soundEngine.volume = settings.volume;
+            soundEngine.muted = settings.muted;
+
+            const updateVolIcon = () => {
+                const icon = document.getElementById('volumeIcon');
+                icon.setAttribute('data-lucide', soundEngine.muted || soundEngine.volume == 0 ? 'volume-x' : 'volume-2');
+                lucide.createIcons();
+            };
+            updateVolIcon();
+
+            volSlider.addEventListener('input', (e) => {
+                settings.volume = parseFloat(e.target.value);
+                soundEngine.volume = settings.volume;
+                if (settings.volume > 0) {
+                    settings.muted = false;
+                    soundEngine.muted = false;
+                }
+                saveSettings();
+                updateVolIcon();
+            });
+
+            muteBtn.addEventListener('click', () => {
+                settings.muted = !settings.muted;
+                soundEngine.muted = settings.muted;
+                saveSettings();
+                updateVolIcon();
+            });
+
+            // Cambiar fondo OBS (Oscuro -> Croma Verde -> Transparente)
+            document.getElementById('bgModeBtn').addEventListener('click', () => {
+                const modes = ['dark', 'chroma', 'transparent'];
+                const nextIdx = (modes.indexOf(settings.bgMode) + 1) % modes.length;
+                settings.bgMode = modes[nextIdx];
+                saveSettings();
+                applyBackgroundMode();
+            });
+
+            // Modo OBS Limpio
+            const topBar = document.getElementById('topBar');
+            const bottomControls = document.getElementById('bottomControls');
+            const exitCleanBtn = document.getElementById('exitCleanModeBtn');
+
+            document.getElementById('cleanModeBtn').addEventListener('click', () => {
+                topBar.classList.add('hidden');
+                bottomControls.classList.add('hidden');
+                exitCleanBtn.classList.remove('hidden');
+                setTimeout(resizeCanvas, 50);
+            });
+
+            exitCleanBtn.addEventListener('click', () => {
+                topBar.classList.remove('hidden');
+                bottomControls.classList.remove('hidden');
+                exitCleanBtn.classList.add('hidden');
+                setTimeout(resizeCanvas, 50);
+            });
+
+            // Abrir / Cerrar Panel Lateral (Drawer)
+            const drawer = document.getElementById('killerDrawer');
+            document.getElementById('toggleDrawerBtn').addEventListener('click', () => {
+                drawer.classList.remove('translate-x-full');
+            });
+            document.getElementById('closeDrawerBtn').addEventListener('click', () => {
+                drawer.classList.add('translate-x-full');
+            });
+
+            // Buscador en vivo
+            document.getElementById('searchKillerInput').addEventListener('input', (e) => {
+                renderKillersList(e.target.value);
+            });
+
+            // Seleccionar / Deseleccionar Todos
+            document.getElementById('selectAllBtn').addEventListener('click', () => {
+                killers.forEach(k => k.active = true);
+                saveKillers();
+                updateActiveCounter();
+                drawWheel();
+                renderKillersList(document.getElementById('searchKillerInput').value);
+            });
+
+            document.getElementById('deselectAllBtn').addEventListener('click', () => {
+                killers.forEach(k => k.active = false);
+                saveKillers();
+                updateActiveCounter();
+                drawWheel();
+                renderKillersList(document.getElementById('searchKillerInput').value);
+            });
+
+            // Toggle Eliminación Automática
+            const autoElimToggle = document.getElementById('autoEliminateToggle');
+            autoElimToggle.checked = settings.autoEliminate;
+            autoElimToggle.addEventListener('change', (e) => {
+                settings.autoEliminate = e.target.checked;
+                saveSettings();
+            });
+
+            // Subida en lote (reconoce cualquier nombre en español/inglés, sin espacios, con números o prefijos de Wiki)
+            const normalizeText = (str) => (str || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/([a-z])([A-Z])/g, '$1 $2')
+                .replace(/[^a-z0-9]+/g, ' ')
+                .trim();
+
+            const stripStopWords = (str) => str
+                .replace(/\b\d+\b/g, ' ')
+                .replace(/\b(el|la|los|las|lo|the|de|del|y|and|portrait|icon|icono|foto|img|killer|asesino|dbd)\b/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            const compactKey = (str) => stripStopWords(normalizeText(str)).replace(/\s+/g, '');
+
+            // Diccionario de alias extra habituales de archivos de DbD
+            const EXTRA_ALIASES = {
+                trapper: ['trampero', 'trapper', 'macmillan', 'evan'],
+                wraith: ['espectro', 'wraith', 'ojomo', 'philip'],
+                hillbilly: ['pueblerino', 'hillbilly', 'billy', 'thompson'],
+                nurse: ['enfermera', 'nurse', 'sally', 'smithson'],
+                shape: ['forma', 'shape', 'myers', 'michael'],
+                hag: ['bruja', 'hag', 'sherwood', 'lisa'],
+                doctor: ['doctor', 'herman', 'carter'],
+                huntress: ['cazadora', 'huntress', 'anna'],
+                cannibal: ['canibal', 'cannibal', 'leatherface', 'bubba'],
+                nightmare: ['pesadilla', 'nightmare', 'freddy', 'krueger'],
+                pig: ['cerda', 'pig', 'amanda', 'young'],
+                clown: ['payaso', 'clown', 'kenneth', 'chase'],
+                spirit: ['espiritu', 'spirit', 'rin', 'yamaoka'],
+                legion: ['legion', 'frank', 'julie', 'susie', 'joey'],
+                plague: ['plaga', 'plague', 'adiris'],
+                ghostface: ['ghostface', 'ghost', 'danny', 'johnson'],
+                demogorgon: ['demogorgon', 'demo'],
+                oni: ['oni', 'kazan'],
+                deathslinger: ['arponero', 'deathslinger', 'caleb', 'quinn'],
+                executioner: ['verdugo', 'executioner', 'pyramid', 'head'],
+                blight: ['deterioro', 'blight', 'talbot', 'grimes'],
+                twins: ['gemelos', 'twins', 'charlotte', 'victor'],
+                trickster: ['traicionero', 'trickster', 'jiwoon', 'hak'],
+                nemesis: ['nemesis'],
+                cenobite: ['cenobita', 'cenobite', 'pinhead'],
+                artist: ['artista', 'artist', 'carmina', 'mora'],
+                onryo: ['onryo', 'sadako', 'yamamura'],
+                dredge: ['draga', 'dredge'],
+                mastermind: ['cerebro', 'mastermind', 'wesker', 'albert'],
+                knight: ['caballero', 'knight', 'tarhos', 'kovacs'],
+                skullmerchant: ['comerciante', 'calaveras', 'skullmerchant', 'merchant', 'adriana', 'imai'],
+                singularity: ['singularidad', 'singularity', 'hux'],
+                xenomorph: ['xenomorfo', 'xenomorph', 'alien', 'xeno'],
+                goodguy: ['chicobueno', 'goodguy', 'chucky'],
+                unknown: ['desconocido', 'unknown'],
+                lich: ['liche', 'lich', 'vecna'],
+                darklord: ['senoroscuro', 'darklord', 'dracula'],
+                houndmaster: ['sabuesos', 'houndmaster', 'portia', 'maye'],
+                ghoul: ['ghoul', 'kaneki', 'ken']
+            };
+
+            document.getElementById('batchUploadInput').addEventListener('change', async (e) => {
+                const files = Array.from(e.target.files);
+                if (!files.length) return;
+
+                let matchedCount = 0;
+                const unmatchedFiles = [];
+
+                for (const file of files) {
+                    const rawName = file.name.replace(/\.[^/.]+$/, '');
+                    // Separar también camelCase antes de pasar a minúsculas
+                    const camelSplit = rawName.replace(/([a-z])([A-Z])/g, '$1 $2');
+                    const normFile = normalizeText(camelSplit);
+                    const coreFile = stripStopWords(normFile);
+                    const compactFile = coreFile.replace(/\s+/g, '');
+                    const fileTokens = coreFile.split(' ').filter(w => w.length >= 2);
+
+                    let bestMatch = null;
+                    let bestScore = 0;
+
+                    for (const k of killers) {
+                        const idKey = compactKey(k.id);
+                        const nameKey = compactKey(k.name);
+                        const aliasKey = compactKey(k.alias);
+                        const extraKeys = EXTRA_ALIASES[k.id] || [];
+
+                        const allKeys = [idKey, nameKey, aliasKey, ...extraKeys].filter(Boolean);
+                        const allTokens = [
+                            ...stripStopWords(normalizeText(k.name)).split(' '),
+                            ...stripStopWords(normalizeText(k.alias)).split(' '),
+                            ...extraKeys
+                        ].filter(t => t.length >= 3);
+
+                        let score = 0;
+
+                        // 1. Coincidencia exacta compacta (ej. "labruja" == "bruja", "the_pig" == "pig", "el_liche" == "liche")
+                        if (compactFile && allKeys.includes(compactFile)) {
+                            score = 100;
+                        }
+                        // 2. Coincidencia exacta de token completo (ej. "k06_hag_portrait" -> token "hag")
+                        else if (fileTokens.some(tok => allKeys.includes(tok) || allTokens.includes(tok))) {
+                            score = 90;
+                        }
+                        // 3. Subcadena compacta en archivos largos (ej. "portrait_la_singularidad_v2" contiene "singularidad")
+                        else if (compactFile.length >= 4 && allKeys.some(key => key.length >= 4 && (compactFile.includes(key) || key.includes(compactFile)))) {
+                            score = 80;
+                        }
+
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMatch = k;
+                        }
+                    }
+
+                    if (bestMatch && bestScore >= 80) {
+                        const dataUrl = await processUploadedImage(file, 180);
+                        bestMatch.customImage = dataUrl;
+                        preloadKillerImage(bestMatch);
+                        matchedCount++;
+                    } else {
+                        unmatchedFiles.push(file.name);
+                    }
+                }
+
+                const savedOk = saveKillers();
+                renderKillersList(document.getElementById('searchKillerInput').value);
+
+                if (!savedOk) return;
+
+                if (matchedCount > 0 && unmatchedFiles.length === 0) {
+                    showToast(`¡Se actualizaron ${matchedCount} retratos correctamente!`);
+                } else if (matchedCount > 0) {
+                    showToast(`Actualizados: ${matchedCount}. Sin coincidencia (${unmatchedFiles.length}): ${unmatchedFiles.slice(0, 3).join(', ')}`);
+                } else {
+                    showToast(`No coincidieron: ${unmatchedFiles.slice(0, 3).join(', ')}. Usa el nombre del asesino.`);
+                }
+                e.target.value = '';
+            });
+
+            // Añadir Asesino Personalizado
+            const customForm = document.getElementById('addCustomForm');
+            document.getElementById('openAddCustomBtn').addEventListener('click', () => {
+                customForm.classList.toggle('hidden');
+            });
+            document.getElementById('cancelCustomBtn').addEventListener('click', () => {
+                customForm.classList.add('hidden');
+            });
+
+            customForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const nameInput = document.getElementById('customNameInput');
+                const aliasInput = document.getElementById('customAliasInput');
+                const colorInput = document.getElementById('customColorInput');
+                const imgInput = document.getElementById('customImageInput');
+
+                const name = nameInput.value.trim();
+                if (!name) return;
+                const alias = aliasInput.value.trim() || 'Asesino Personalizado';
+                const color = colorInput.value || '#7f1d1d';
+
+                const newKiller = {
+                    id: 'custom_' + Date.now(),
+                    name: name,
+                    alias: alias,
+                    color: color,
+                    accent: '#f59e0b',
+                    glyph: 'trap',
+                    active: true,
+                    isCustom: true,
+                    customImage: null,
+                    defaultImage: null
+                };
+
+                newKiller.defaultImage = generateStylizedPortrait(newKiller);
+                if (imgInput.files && imgInput.files[0]) {
+                    newKiller.customImage = await processUploadedImage(imgInput.files[0], 256);
+                }
+
+                killers.unshift(newKiller);
+                saveKillers();
+                preloadKillerImage(newKiller);
+                updateActiveCounter();
+                renderKillersList(document.getElementById('searchKillerInput').value);
+
+                nameInput.value = '';
+                aliasInput.value = '';
+                colorInput.value = '#7f1d1d';
+                imgInput.value = '';
+                customForm.classList.add('hidden');
+                showToast(`¡${name} añadido a la ruleta!`);
+            });
+
+            // Restaurar datos de fábrica con confirmación en línea
+            const resetConfirmBar = document.getElementById('resetConfirmBar');
+            document.getElementById('resetAllDataBtn').addEventListener('click', () => {
+                resetConfirmBar.classList.remove('hidden');
+            });
+
+            document.getElementById('confirmResetNoBtn').addEventListener('click', () => {
+                resetConfirmBar.classList.add('hidden');
+            });
+
+            document.getElementById('confirmResetYesBtn').addEventListener('click', () => {
+                resetConfirmBar.classList.add('hidden');
+                localStorage.removeItem(STORAGE_KEY);
+                imageCache.clear();
+                loadState();
+                updateActiveCounter();
+                drawWheel();
+                renderKillersList(document.getElementById('searchKillerInput').value);
+                showToast('Lista, nombres, colores y retratos restaurados por defecto.');
+            });
+
+            // Eventos del Modal Ganador
+            const winnerModal = document.getElementById('winnerModal');
+            document.getElementById('closeWinnerModalBtn').addEventListener('click', () => {
+                winnerModal.classList.add('hidden');
+            });
+
+            document.getElementById('editWinnerBtn').addEventListener('click', () => {
+                if (selectedWinner) {
+                    openEditKillerModal(selectedWinner.id);
+                }
+            });
+
+            document.getElementById('spinAgainBtn').addEventListener('click', () => {
+                winnerModal.classList.add('hidden');
+                startSpin();
+            });
+
+            document.getElementById('eliminateAndContinueBtn').addEventListener('click', () => {
+                if (selectedWinner) {
+                    selectedWinner.active = false;
+                    saveKillers();
+                    updateActiveCounter();
+                    renderKillersList(document.getElementById('searchKillerInput').value);
+                    drawWheel();
+                    showToast(`${selectedWinner.name} retirado de la ruleta.`);
+                }
+                winnerModal.classList.add('hidden');
+            });
+
+            // Eventos del Modal de Edición de Personaje
+            const editModal = document.getElementById('editKillerModal');
+            const closeEditModal = () => {
+                editModal.classList.add('hidden');
+                editingKillerId = null;
+                editingTempCustomImage = undefined;
+            };
+
+            document.getElementById('closeEditModalBtn').addEventListener('click', closeEditModal);
+            document.getElementById('cancelEditModalBtn').addEventListener('click', closeEditModal);
+
+            // Actualización en vivo de vista previa al escribir o cambiar color
+            document.getElementById('editNameInput').addEventListener('input', updateEditModalPreview);
+            document.getElementById('editAliasInput').addEventListener('input', updateEditModalPreview);
+            document.getElementById('editColorInput').addEventListener('input', updateEditModalPreview);
+
+            // Colores predefinidos rápidos
+            document.querySelectorAll('.preset-color-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('editColorInput').value = btn.dataset.color;
+                    updateEditModalPreview();
+                });
+            });
+
+            // Subida de imagen desde los dos inputs del modal o Drag & Drop
+            document.getElementById('editImageFileInput').addEventListener('change', (e) => {
+                if (e.target.files[0]) handleEditModalImageFile(e.target.files[0]);
+                e.target.value = '';
+            });
+            document.getElementById('editImageBtnInput').addEventListener('change', (e) => {
+                if (e.target.files[0]) handleEditModalImageFile(e.target.files[0]);
+                e.target.value = '';
+            });
+
+            const editDropZone = document.getElementById('editPortraitDropZone');
+            editDropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                editDropZone.classList.add('ring-4', 'ring-red-500');
+            });
+            editDropZone.addEventListener('dragleave', () => {
+                editDropZone.classList.remove('ring-4', 'ring-red-500');
+            });
+            editDropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                editDropZone.classList.remove('ring-4', 'ring-red-500');
+                if (e.dataTransfer.files[0]) {
+                    handleEditModalImageFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            // Restaurar retrato original dentro del modal de edición
+            document.getElementById('editRestorePortraitBtn').addEventListener('click', () => {
+                editingTempCustomImage = null;
+                updateEditModalPreview();
+                showToast('Retrato restaurado al diseño original.');
+            });
+
+            // Eliminar personaje personalizado desde el modal de edición
+            document.getElementById('editDeleteCustomBtn').addEventListener('click', () => {
+                if (!editingKillerId) return;
+                const killer = killers.find(k => k.id === editingKillerId);
+                if (!killer || !killer.isCustom) return;
+
+                killers = killers.filter(k => k.id !== editingKillerId);
+                imageCache.delete(editingKillerId);
+                saveKillers();
+                updateActiveCounter();
+                drawWheel();
+                renderKillersList(document.getElementById('searchKillerInput').value);
+
+                if (selectedWinner && selectedWinner.id === editingKillerId) {
+                    winnerModal.classList.add('hidden');
+                }
+                closeEditModal();
+                showToast(`Personaje "${killer.name}" eliminado.`);
+            });
+
+            // Guardar cambios del personaje editado
+            document.getElementById('editKillerForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const killer = killers.find(k => k.id === editingKillerId);
+                if (!killer) return;
+
+                const newName = document.getElementById('editNameInput').value.trim();
+                if (!newName) return;
+
+                killer.name = newName;
+                killer.alias = document.getElementById('editAliasInput').value.trim();
+                killer.color = document.getElementById('editColorInput').value || '#7f1d1d';
+
+                // Regenerar retrato por defecto acorde al nuevo nombre/color
+                killer.defaultImage = generateStylizedPortrait(killer);
+
+                if (editingTempCustomImage !== undefined) {
+                    killer.customImage = editingTempCustomImage;
+                }
+
+                saveKillers();
+                preloadKillerImage(killer, () => {
+                    drawWheel();
+                    renderKillersList(document.getElementById('searchKillerInput').value);
+                });
+
+                // Si el modal del ganador está abierto con este asesino, actualizarlo en tiempo real
+                if (selectedWinner && selectedWinner.id === killer.id && !winnerModal.classList.contains('hidden')) {
+                    document.getElementById('winnerPortraitImg').src = killer.customImage || killer.defaultImage;
+                    document.getElementById('winnerNameTitle').textContent = killer.name;
+                    document.getElementById('winnerSubtitle').textContent = killer.alias || 'Asesino del Ente';
+                }
+
+                closeEditModal();
+                showToast(`Cambios guardados para "${killer.name}".`);
+            });
+        }
+
+        // Inicialización al cargar la página
+        window.addEventListener('load', () => {
+            lucide.createIcons();
+            loadState();
+            applyBackgroundMode();
+            updateActiveCounter();
+            renderKillersList();
+            initUIEvents();
+            resizeCanvas();
+            animateLoop();
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>
